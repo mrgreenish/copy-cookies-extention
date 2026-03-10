@@ -82,21 +82,31 @@ document.addEventListener('DOMContentLoaded', () => {
       let successCount = 0;
       let failCount = 0;
 
+      const targetUrlObj = new URL(targetUrl);
+      const targetIsSecure = targetUrlObj.protocol === 'https:';
+
       for (const cookie of cookies) {
         try {
+          // Skip expired cookies
+          if (!cookie.session && cookie.expirationDate && cookie.expirationDate < Date.now() / 1000) {
+            failCount++;
+            continue;
+          }
+
           const details = {
             url: targetUrl,
             name: cookie.name,
             value: cookie.value,
             path: cookie.path,
-            secure: cookie.secure,
             httpOnly: cookie.httpOnly,
             sameSite: cookie.sameSite,
           };
 
-          if (!cookie.hostOnly) {
-            details.domain = cookie.domain;
-          }
+          // Secure flag: only set if target is HTTPS
+          details.secure = cookie.secure && targetIsSecure;
+
+          // Don't set domain — let Chrome derive it from the target URL.
+          // Setting the original source domain causes failures on cross-domain paste.
 
           if (!cookie.session && cookie.expirationDate) {
             details.expirationDate = cookie.expirationDate;
