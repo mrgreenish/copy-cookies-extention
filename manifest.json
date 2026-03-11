@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Copy Cookies",
+  "name": "Filip's magische cookie plakker",
   "version": "1.0.0",
   "description": "Copy cookies from one tab and paste them into another. Useful for replicating login sessions.",
   "permissions": [
