@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   const copyBtn = document.getElementById('copy-btn');
   const pasteBtn = document.getElementById('paste-btn');
+  const exportBtn = document.getElementById('export-btn');
   const statusEl = document.getElementById('status');
   const clipboardInfoEl = document.getElementById('clipboard-info');
 
@@ -8,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   copyBtn.addEventListener('click', handleCopy);
   pasteBtn.addEventListener('click', handlePaste);
+  exportBtn.addEventListener('click', handleExport);
 
   async function getActiveTab() {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -144,10 +146,12 @@ document.addEventListener('DOMContentLoaded', () => {
       clipboardInfoEl.textContent = `${count} cookies from ${sourceHostname} (${timeAgo})`;
       clipboardInfoEl.classList.remove('empty');
       pasteBtn.disabled = false;
+      exportBtn.disabled = false;
     } else {
       clipboardInfoEl.textContent = 'No cookies copied yet';
       clipboardInfoEl.classList.add('empty');
       pasteBtn.disabled = true;
+      exportBtn.disabled = true;
     }
   }
 
@@ -157,6 +161,44 @@ document.addEventListener('DOMContentLoaded', () => {
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
     if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
     return `${Math.floor(seconds / 86400)}d ago`;
+  }
+
+  function convertToPlaywright(chromeCookies) {
+    const sameSiteMap = { no_restriction: 'None', lax: 'Lax', strict: 'Strict', unspecified: 'None' };
+    return {
+      cookies: chromeCookies.map(c => ({
+        name: c.name,
+        value: c.value,
+        domain: c.domain,
+        path: c.path,
+        expires: c.session ? -1 : (c.expirationDate ?? -1),
+        httpOnly: c.httpOnly,
+        secure: c.secure,
+        sameSite: sameSiteMap[c.sameSite] ?? 'None',
+      })),
+      origins: [],
+    };
+  }
+
+  async function handleExport() {
+    try {
+      const result = await chrome.storage.local.get('copiedCookies');
+      if (!result.copiedCookies) {
+        showStatus('No cookies in clipboard. Copy some first!', 'warning');
+        return;
+      }
+      const json = JSON.stringify(convertToPlaywright(result.copiedCookies.cookies), null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = 'playwright-cookies.json';
+      anchor.click();
+      URL.revokeObjectURL(url);
+      showStatus(`Exported ${result.copiedCookies.count} cookies for Playwright`, 'success');
+    } catch (err) {
+      showStatus(`Error: ${err.message}`, 'error');
+    }
   }
 
   function showStatus(message, type) {
